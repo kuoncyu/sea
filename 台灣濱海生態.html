@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣濱海生態圖鑑 (完美不重複版)</title>
+    <style>
+        :root { --primary: #006064; --secondary: #ff7043; --bg: #e0f7fa; --card-bg: #fff; }
+        body { font-family: "Noto Sans TC", sans-serif; background: var(--bg); margin: 0; padding-bottom: 60px; color: #333; user-select: none; }
+        
+        header { background: linear-gradient(135deg, #004d40, #006064); color: #fff; padding: 40px 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
+        h1 { margin: 0; font-size: 2rem; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        p { color: #80cbc4; font-size: 1rem; margin-top: 8px; }
+
+        /* 音樂控制按鈕 */
+        .sound-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.6);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+        .sound-toggle:hover { background: rgba(0,0,0,0.5); transform: scale(1.05); }
+        .sound-toggle.playing { background: var(--secondary); border-color: var(--secondary); box-shadow: 0 0 10px var(--secondary); }
+
+        .nav { display: flex; justify-content: center; gap: 10px; padding: 15px; background: rgba(255,255,255,0.95); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); backdrop-filter: blur(5px); }
+        .nav-btn { padding: 8px 20px; border: 2px solid var(--primary); border-radius: 25px; background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .nav-btn.active { background: var(--primary); color: #fff; box-shadow: 0 4px 6px rgba(0,96,100,0.3); }
+
+        .container { max-width: 1200px; margin: auto; padding: 20px; }
+        .section { display: none; animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 每日一抽 - 3D */
+        .daily-card-container { perspective: 1000px; max-width: 400px; height: 550px; margin: 30px auto; cursor: pointer; }
+        .daily-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.8s; transform-style: preserve-3d; }
+        .daily-card-container.flipped .daily-card-inner { transform: rotateY(180deg); }
+        .daily-card-front, .daily-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); overflow: hidden; }
+        
+        .daily-card-front { background: linear-gradient(135deg, #26a69a, #004d40); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 6px solid #e0f2f1; }
+        .front-icon { font-size: 6rem; margin-bottom: 20px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3)); }
+        
+        .daily-card-back { background: #fff; transform: rotateY(180deg); display: flex; flex-direction: column; }
+        .daily-img-box { width: 100%; height: 55%; background: #eceff1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .daily-img { width: 100%; height: 100%; object-fit: contain; background-color: #f5f5f5; }
+        
+        .daily-content { padding: 25px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; text-align: left; }
+        .tag { background: var(--secondary); color: #fff; padding: 4px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; font-weight: bold; }
+
+        /* 列表 */
+        .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px; justify-content: center; }
+        select, input { padding: 12px; border: 1px solid #b2dfdb; border-radius: 8px; font-size: 1rem; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        select:focus, input:focus { border-color: var(--primary); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+        .grid-item { background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; transition: 0.3s; border-left: 5px solid transparent; position: relative; overflow: hidden; }
+        .grid-item:hover { transform: translateY(-5px); border-left-color: var(--secondary); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .grid-item h3 { margin: 5px 0; color: var(--primary); font-size: 1.3rem; font-weight: 700; }
+        .grid-item .old { color: #78909c; font-size: 0.9rem; font-style: italic; }
+        .category-label { color: var(--secondary); font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* 測驗 */
+        .quiz-box { max-width: 650px; margin: auto; background: #fff; padding: 40px; border-radius: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .quiz-control { margin-bottom: 20px; text-align: center; }
+        .quiz-img-box { width: 100%; height: 320px; margin-bottom: 25px; border-radius: 16px; overflow: hidden; background: #f1f8e9; display: flex; align-items: center; justify-content: center; border: 1px solid #e0e0e0; }
+        .quiz-img { width: 100%; height: 100%; object-fit: contain; }
+        .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+        .q-btn { padding: 18px; border: 2px solid #e0f2f1; background: #fff; border-radius: 12px; cursor: pointer; font-size: 1.05rem; font-weight: bold; transition: 0.2s; color: #455a64; }
+        .q-btn:hover:not(:disabled) { background: #e0f7fa; border-color: #b2ebf2; }
+        .q-btn.correct { background: #c8e6c9; border-color: #4caf50; color: #2e7d32; }
+        .q-btn.wrong { background: #ffcdd2; border-color: #ef5350; color: #c62828; }
+        .quiz-progress { font-size: 0.9rem; color: #78909c; margin-top: 10px; font-weight: bold; }
+
+        /* Modal */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { background: #fff; width: 100%; max-width: 550px; border-radius: 20px; overflow: hidden; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .modal-img-box { width: 100%; height: 350px; background: #263238; display: flex; align-items: center; justify-content: center; }
+        .modal-img { width: 100%; height: 100%; object-fit: contain; }
+        .modal-body { padding: 30px; }
+        .close-btn { width: 100%; padding: 15px; background: var(--primary); color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>
+    <button class="sound-toggle" onclick="toggleMusic()" id="musicBtn">
+        <span>🔈</span> 背景音樂：關
+    </button>
+    <h1>🌿 台灣濱海生態圖鑑</h1>
+    <p>題目不重複 • 沉浸式海浪聲</p>
+</header>
+
+<div class="nav">
+    <button class="nav-btn active" onclick="setTab('daily', this); playSfx('click')">🦀 每日一物</button>
+    <button class="nav-btn" onclick="setTab('quiz', this); playSfx('click')">🔍 生態測驗</button>
+    <button class="nav-btn" onclick="setTab('list', this); playSfx('click')">📖 完整圖鑑</button>
+</div>
+
+<div class="container">
+    <div id="tab-daily" class="section active">
+        <div class="daily-card-container" onclick="flipCard()">
+            <div class="daily-card-inner">
+                <div class="daily-card-front">
+                    <div class="front-icon">🐢</div>
+                    <h2>今日生態運勢</h2>
+                    <p>點擊翻開，探索今天的海洋夥伴</p>
+                    <small style="margin-top:20px; opacity:0.8;">(每日 00:00 更新)</small>
+                </div>
+                <div class="daily-card-back">
+                    <div class="daily-img-box">
+                        <img id="d-img" class="daily-img" src="" alt="載入中...">
+                    </div>
+                    <div class="daily-content" onclick="openModal(dailyItem); event.stopPropagation();">
+                        <div style="margin-bottom:5px;"><span class="tag" id="d-category"></span></div>
+                        <h2 id="d-fullname" style="margin:5px 0 10px 0; font-size:1.8rem; color:var(--primary);"></h2>
+                        <div style="color:#666; font-style:italic; margin-bottom:15px;" id="d-alias"></div>
+                        <p style="font-size:1rem; color:#444; line-height:1.6;">(點擊查看詳細特徵)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-quiz" class="section">
+        <div class="quiz-box">
+            <div class="quiz-control">
+                <label for="quiz-filter" style="font-weight:bold; color:var(--primary); margin-right:10px;">測驗範圍：</label>
+                <select id="quiz-filter" onchange="resetQuizQueue()" style="padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    <option value="all">不限種類 (綜合測驗)</option>
+                </select>
+                <div id="quiz-status" class="quiz-progress"></div>
+            </div>
+
+            <div class="quiz-img-box">
+                <img id="q-img" class="quiz-img" src="" alt="載入中...">
+            </div>
+            <h3 style="color:#546e7a; margin:0 0 10px 0;">看圖猜猜看，這是什麼生物？</h3>
+            <h1 id="q-question" style="font-size:1.5rem; margin:10px 0; color:var(--primary);"></h1>
+            <div id="q-options" class="quiz-options"></div>
+            <div id="q-feedback" style="margin-top:20px; text-align:left; display:none; background:#e0f2f1; padding:20px; border-radius:12px; border-left: 5px solid var(--primary);"></div>
+            <button onclick="nextQuiz(); playSfx('click')" style="margin-top:25px; padding:12px 30px; background:var(--primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:1.1rem; width:100%;">下一題</button>
+        </div>
+    </div>
+
+    <div id="tab-list" class="section">
+        <div class="filter-bar">
+            <select id="category-filter" onchange="renderList()">
+                <option value="">全部分類</option>
+            </select>
+            <input type="text" id="keyword" placeholder="搜尋物種名稱..." onkeyup="renderList()">
+        </div>
+        <div id="list-grid" class="grid"></div>
+        <div style="text-align:center; margin-top:30px; color:#90a4ae; font-size:0.9rem;">已收錄 <span id="total-count">0</span> 筆資料</div>
+    </div>
+</div>
+
+<div id="modal" class="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-img-box">
+            <img id="m-img" class="modal-img" src="">
+        </div>
+        <div class="modal-body">
+            <span style="color:var(--secondary); font-weight:bold; font-size:0.9rem; text-transform:uppercase;" id="m-category"></span>
+            <h2 id="m-name" style="margin:5px 0 10px 0; color:var(--primary); font-size:2rem;"></h2>
+            <div id="m-alias" style="background:#f5f5f5; display:inline-block; padding:6px 12px; border-radius:6px; color:#555; font-style:italic; margin-bottom:20px;"></div>
+            <p id="m-desc" style="line-height:1.8; text-align:justify; color:#333; font-size:1.05rem;"></p>
+            <button class="close-btn" onclick="closeModal()">關閉詳情</button>
+        </div>
+    </div>
+</div>
+
+<audio id="bgm" loop preload="auto">
+    <source src="https://upload.wikimedia.org/wikipedia/commons/transcoded/7/7f/Ocean_waves_lapping_at_shore.ogg/Ocean_waves_lapping_at_shore.ogg.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// --- 音效管理系統 ---
+let isMuted = true;
+const bgm = document.getElementById('bgm');
+const musicBtn = document.getElementById('musicBtn');
+
+// 設定背景音樂音量 (0.0 - 1.0)，設為 0.3 比較不會干擾操作
+bgm.volume = 0.3;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function toggleMusic() {
+    // 瀏覽器通常會暫停 AudioContext，需要用戶互動後才能恢復
+    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+
+    isMuted = !isMuted;
+    if(!isMuted) {
+        // 播放音樂
+        bgm.play().then(() => {
+            musicBtn.innerHTML = "<span>🔊</span> 背景音樂：開";
+            musicBtn.classList.add('playing');
+            playSfx('click');
+        }).catch(error => {
+            console.log("Autoplay prevented:", error);
+            alert("請先點擊頁面任意處，瀏覽器才允許播放聲音喔！");
+            isMuted = true;
+        });
+    } else {
+        // 暫停音樂
+        bgm.pause();
+        musicBtn.innerHTML = "<span>🔈</span> 背景音樂：關";
+        musicBtn.classList.remove('playing');
+    }
+}
+
+function playSfx(type) {
+    if(isMuted) return;
+    // 確保 AudioContext 是活躍的
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'flip') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(400, now + 0.2);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2);
+    } else if (type === 'correct') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.setValueAtTime(1200, now + 0.1); 
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+    } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+    }
+}
+
+// --- 資料庫 ---
+const db = [
+    // === 濱海植物 ===
+    {c:"濱海植物", n:"馬鞍藤", o:"Ipomoea pes-caprae", d:"沙灘上最常見的藤本植物，葉片互生，形狀像馬鞍，開紫紅色的花，能定沙防風。"},
+    {c:"濱海植物", n:"林投", o:"Pandanus odoratissimus", d:"常綠灌木，葉緣有銳刺，果實聚合狀像鳳梨，是極佳的防風林樹種。"},
+    {c:"濱海植物", n:"黃槿", o:"Hibiscus tiliaceus", d:"葉片心形厚實，早期農民常墊在粿下方蒸煮。開黃色花，中心暗紫色。"},
+    {c:"濱海植物", n:"草海桐", o:"Scaevola taccada", d:"花形特殊，像是只有半邊的花朵。葉片油亮聚生於枝頂，耐鹽性佳。"},
+    {c:"濱海植物", n:"水筆仔", o:"Kandelia obovata", d:"紅樹林代表植物，果實像毛筆，具「胎生」現象，落地插在泥灘即可生長。"},
+    {c:"濱海植物", n:"海茄冬", o:"Avicennia marina", d:"台灣分佈最廣的紅樹林植物，具有從地底向上生長的棒狀「呼吸根」。"},
+    {c:"濱海植物", n:"五梨跤", o:"Rhizophora stylosa", d:"紅樹林植物，具有發達的蜘蛛腳狀「支持根」，胎生苗比水筆仔更長。"},
+    {c:"濱海植物", n:"欖李", o:"Lumnitzera racemosa", d:"台灣最耐鹽的紅樹林植物，開滿白花，葉片頂端凹陷是主要特徵。"},
+    {c:"濱海植物", n:"濱刺麥", o:"Spinifex littoreus", d:"雌雄異株，雌花序呈海膽狀球形，成熟後隨風在沙灘滾動傳播種子。"},
+    {c:"濱海植物", n:"木麻黃", o:"Casuarina equisetifolia", d:"海岸防風林主要樹種，葉退化成鞘狀齒，那綠色針狀物其實是小枝。"},
+    {c:"濱海植物", n:"白水木", o:"Heliotropium arboreum", d:"葉片覆滿銀白色絨毛，生長在珊瑚礁岸或沙灘，樹型優美。"},
+    {c:"濱海植物", n:"文珠蘭", o:"Crinum asiaticum", d:"大型多年生草本，葉片寬大長條狀，花白色且有香氣。"},
+    {c:"濱海植物", n:"待宵花", o:"Oenothera laciniata", d:"沙灘常見植物，黃色花朵通常在傍晚開放，清晨凋謝。"},
+    {c:"濱海植物", n:"海馬齒", o:"Sesuvium portulacastrum", d:"肉質葉片，能儲存水分抗旱抗鹽，開粉紅色小花，也是常見定沙植物。"},
+    {c:"濱海植物", n:"苦林盤", o:"Clerodendrum inerme", d:"常綠灌木，葉對生，開白色長筒狀花，紅紫色花絲伸出花外。"},
+    {c:"濱海植物", n:"土沉香", o:"Excoecaria agallocha", d:"半落葉喬木，生長於海岸或紅樹林邊緣，全株汁液有毒，觸碰需小心。"},
+    {c:"濱海植物", n:"銀合歡", o:"Leucaena leucocephala", d:"外來入侵種，生命力強，常見於海岸荒地，會分泌毒素抑制其他植物。"},
+    {c:"濱海植物", n:"單花蟛蜞菊", o:"Widelia biflora", d:"攀緣性草本，開黃色小花，常見於海岸草叢。"},
+    {c:"濱海植物", n:"蔓荊", o:"Vitex rotundifolia", d:"全株有香氣，匍匐於沙灘生長，開藍紫色花，果實是中藥材。"},
+    {c:"濱海植物", n:"台灣海棗", o:"Phoenix hanceana", d:"台灣原生種棕櫚科植物，耐旱耐鹽，果實成熟變黑可食。"},
+    {c:"濱海植物", n:"水黃皮", o:"Pongamia pinnata", d:"俗稱九重吹，抗風耐鹽，種子能漂浮水面傳播，常種植為行道樹。"},
+    {c:"濱海植物", n:"瓊崖海棠", o:"Calophyllum inophyllum", d:"果實球形像彈珠，葉片厚革質，樹姿優美，是良好的海岸防風林。"},
+    {c:"濱海植物", n:"棋盤腳", o:"Barringtonia asiatica", d:"果實方形像棋盤底座，主要生長於蘭嶼、恆春，花朵夜間開放極美。"},
+    {c:"濱海植物", n:"穗花棋盤腳", o:"Barringtonia racemosa", d:"又稱水茄冬，花朵成串下垂，夜間開花如煙火，清晨掉落。"},
+    {c:"濱海植物", n:"濱刀豆", o:"Canavalia rosea", d:"豆科蔓生植物，花粉紅色，豆莢可長達10公分，常見於沙灘。"},
+    {c:"濱海植物", n:"濱豇豆", o:"Vigna marina", d:"黃色花朵，葉片三出複葉，是優良的沙地覆蓋植物。"},
+    {c:"濱海植物", n:"厚葉牽牛", o:"Ipomoea imperati", d:"葉片厚實，花朵白色中心帶黃，匍匐於沙灘生長。"},
+    {c:"濱海植物", n:"魯花樹", o:"Scolopia oldhamii", d:"常綠喬木，莖幹有長刺，是海岸防風林的優良樹種。"},
+    {c:"濱海植物", n:"大葉山欖", o:"Palaquium formosanum", d:"葉片叢生枝端，質厚，樹幹有板根現象，原產於蘭嶼。"},
+    {c:"濱海植物", n:"海檬果", o:"Cerbera manghas", d:"全株有毒，果實像芒果但不可食，花白色中心紅色，常植於海岸。"},
+
+    // === 留鳥 ===
+    {c:"留鳥", n:"小白鷺", o:"Egretta garzetta", d:"全身白色，嘴黑色，腳黑色但腳趾黃色。繁殖期頭後有兩根飾羽。"},
+    {c:"留鳥", n:"夜鷺", o:"Nycticorax nycticorax", d:"俗稱暗光鳥。頭頂及背部深藍色，眼睛紅色。常在晨昏或夜間水邊捕魚。"},
+    {c:"留鳥", n:"翠鳥", o:"Alcedo atthis", d:"俗稱魚狗。羽毛寶藍色與翠綠色金屬光澤，腹部橙色，常衝入水中捕魚。"},
+    {c:"留鳥", n:"褐頭鷦鶯", o:"Prinia inornata", d:"常見於芒草叢，叫聲「滴、滴、滴...」，尾羽長。"},
+    {c:"留鳥", n:"東方環頸鴴", o:"Charadrius peronii", d:"沙灘常見的小型涉禽，頸部有黑色環帶（不閉合），行走速度極快。"},
+    {c:"留鳥", n:"斑文鳥", o:"Lonchura punctulata", d:"胸腹部有鱗片狀斑紋，常成群在草叢啄食種子。"},
+    {c:"留鳥", n:"大捲尾", o:"Dicrurus macrocercus", d:"俗稱烏秋。全身黑色有光澤，尾羽長且分叉如剪刀，領域性強。"},
+    {c:"留鳥", n:"喜鵲", o:"Pica pica", d:"黑白相間，尾羽很長，叫聲響亮粗啞，常見於開闊地。"},
+    {c:"留鳥", n:"岩鷺", o:"Egretta sacra", d:"有白色型與黑色型，常單獨出現在礁岩海岸，很少出現在沙岸。"},
+    {c:"留鳥", n:"白頭翁", o:"Pycnonotus sinensis", d:"頭頂後方有明顯白斑，城市與海邊防風林皆常見。"},
+    {c:"留鳥", n:"紅鳩", o:"Streptopelia tranquebarica", d:"台灣最小的鳩鴿科，公鳥頸後有黑色頸環，體色偏紅。"},
+    {c:"留鳥", n:"珠頸斑鳩", o:"Spilopelia chinensis", d:"頸部有佈滿白點的黑色頸環，叫聲低沉「咕、咕、咕」。"},
+    {c:"留鳥", n:"魚鷹", o:"Pandion haliaetus", d:"大型猛禽，擅長俯衝入水抓魚，常在河口或海岸盤旋。"},
+    {c:"留鳥", n:"黃頭鷺", o:"Bubulcus ibis", d:"俗稱牛背鷺，常停在牛背上或耕耘機旁，繁殖期頭頸羽毛變黃。"},
+    {c:"留鳥", n:"栗喉蜂虎", o:"Merops philippinus", d:"金門特色鳥種，色彩鮮豔，會在土堤上挖洞築巢。"},
+
+    // === 候鳥 ===
+    {c:"候鳥", n:"黑面琵鷺", o:"Platalea minor", d:"冬候鳥。世界級保育類，嘴長扁平像湯匙，在水中左右掃動覓食。"},
+    {c:"候鳥", n:"高蹺鴴", o:"Himantopus himantopus", d:"冬候鳥。擁有一雙粉紅色的超長腳，黑翅白身，優雅地在淺灘行走。"},
+    {c:"候鳥", n:"大白鷺", o:"Ardea alba", d:"冬候鳥。體型最大的白鷺，脖子呈S型顯著彎曲，嘴裂超過眼睛後方。"},
+    {c:"候鳥", n:"蒼鷺", o:"Ardea cinerea", d:"冬候鳥。體型大，全身灰色，常定點站立不動等待獵物，俗稱老等。"},
+    {c:"候鳥", n:"小燕鷗", o:"Sternula albifrons", d:"夏候鳥。體型小，尾羽分叉，夏天會在河口或沙灘地面巢育雛。"},
+    {c:"候鳥", n:"鳳頭燕鷗", o:"Thalasseus bergii", d:"夏候鳥。頭頂有黑色羽冠，嘴黃色，常見於馬祖等離島繁殖。"},
+    {c:"候鳥", n:"紅尾伯勞", o:"Lanius cristatus", d:"冬候鳥。有黑色眼罩，常停在突出枝頭，會有「儲食」行為。"},
+    {c:"候鳥", n:"赤足鷸", o:"Tringa totanus", d:"冬候鳥。腳與嘴基部為鮮紅色，明顯易認。"},
+    {c:"候鳥", n:"反嘴鴴", o:"Recurvirostra avosetta", d:"冬候鳥。嘴黑色且向上彎曲，黑白羽色分明，覓食時嘴在水中左右擺動。"},
+    {c:"候鳥", n:"大杓鷸", o:"Numenius arquata", d:"冬候鳥。嘴很長且向下彎曲，體型大，常在泥灘地挖掘底棲生物。"},
+    {c:"候鳥", n:"黑腹濱鷸", o:"Calidris alpina", d:"冬候鳥。小型鷸科，冬季羽色背面灰褐，腹部白，常成大群活動。"},
+    {c:"候鳥", n:"埃及聖䴉", o:"Threskiornis aethiopicus", d:"外來種。雖是外來種但已在台定居，頭頸黑色無毛，嘴長下彎。"},
+    {c:"候鳥", n:"翻石鷸", o:"Arenaria interpres", d:"冬候鳥。腿短嘴尖，會用嘴翻開石頭尋找底下的小生物吃。"},
+    {c:"候鳥", n:"三趾濱鷸", o:"Calidris alba", d:"冬候鳥。只有三根腳趾，喜歡跟隨海浪進退在沙灘上奔跑覓食。"},
+    {c:"候鳥", n:"金斑鴴", o:"Pluvialis fulva", d:"冬候鳥。背部有金色斑點，常在草地或灘地成群活動。"},
+    {c:"候鳥", n:"中杓鷸", o:"Numenius phaeopus", d:"冬候鳥。嘴長下彎但比大杓鷸短，頭頂有數條深褐色縱紋。"},
+    {c:"候鳥", n:"磯鷸", o:"Actitis hypoleucos", d:"冬候鳥。常見於單獨活動，行走時尾巴會上下擺動，飛行時翅膀有白帶。"},
+    {c:"候鳥", n:"東方白鸛", o:"Ciconia boyciana", d:"稀有迷鳥。體型巨大的黑白色鸛鳥，嘴黑色，眼睛周圍紅色。"},
+
+    // === 螃蟹 ===
+    {c:"螃蟹", n:"弧邊招潮蟹", o:"Uca arcuata", d:"雄蟹有一隻巨大的橘紅色螯，背甲有網狀花紋，常在紅樹林泥灘地揮舞大螯。"},
+    {c:"螃蟹", n:"清白招潮蟹", o:"Uca lactea", d:"體色全身雪白，雄蟹大螯也是白色，喜歡在較乾的沙泥灘活動。"},
+    {c:"螃蟹", n:"北方呼喚招潮蟹", o:"Uca vocans", d:"俗稱黃螯招潮蟹。雄蟹大螯為黃色，大螯掌節下半部為橙色，常見於低潮線泥灘。"},
+    {c:"螃蟹", n:"萬歲大眼蟹", o:"Macrophthalmus banzai", d:"眼睛細長在眼柄頂端，喜歡舉起雙螯揮舞，動作像在喊萬歲。"},
+    {c:"螃蟹", n:"斯氏沙蟹", o:"Ocypode stimpsoni", d:"俗稱鬼蟹。奔跑速度極快，身體呈方形，顏色與沙灘相近，眼睛大。"},
+    {c:"螃蟹", n:"短指和尚蟹", o:"Mictyris brevidactylus", d:"俗稱兵蟹。圓球狀淡藍色身體，退潮時成群移動像軍隊，能直著走。"},
+    {c:"螃蟹", n:"角眼沙蟹", o:"Ocypode ceratophthalmus", d:"成體眼睛上方有明顯的角狀突起，跑得非常快，是沙灘上的短跑健將。"},
+    {c:"螃蟹", n:"雙扇股窗蟹", o:"Scopimera bitympana", d:"會在沙灘上製造擬糞（小沙球），以此濾食沙中有機質，形成幾何圖案。"},
+    {c:"螃蟹", n:"兇狠圓軸蟹", o:"Cardisoma carnifex", d:"大型陸蟹，棲息於海岸防風林或草叢，繁殖期會抱卵下海。"},
+    {c:"螃蟹", n:"無齒螳臂蟹", o:"Chiromantes dehaani", d:"常見於河口與稻田，螯足強壯，常在堤岸邊活動。"},
+    {c:"螃蟹", n:"短槳蟹", o:"Thalamita", d:"最後一對腳特化成扁平槳狀，善於游泳，性情兇猛。"},
+    {c:"螃蟹", n:"鋸緣青蟹", o:"Scylla serrata", d:"俗稱紅蟳或處女蟳，棲息於河口泥灘，體型大，具食用價值。"},
+    {c:"螃蟹", n:"陸寄居蟹", o:"Coenobita", d:"生活在陸地上的寄居蟹，需要揹著螺殼保護柔軟腹部，夜晚活動為主。"},
+    {c:"螃蟹", n:"紫地蟹", o:"Gecarcoidea lalandii", d:"體色紫紅色的陸蟹，多棲息於海岸林下，需回海釋卵。"},
+    {c:"螃蟹", n:"字紋弓蟹", o:"Varuna litterata", d:"俗稱扁蟹，體型扁平適合游泳，常隨漂流木在海上漂流。"},
+
+    // === 潮間帶生物 ===
+    {c:"潮間帶生物", n:"彈塗魚", o:"Periophthalmus modestus", d:"俗稱泥猴。小型，能在泥灘上彈跳移動，主要用皮膚呼吸，眼睛突出。"},
+    {c:"潮間帶生物", n:"大彈塗魚", o:"Boleophthalmus pectinirostris", d:"俗稱花跳。體型較大，身體有藍色亮點，背鰭展開美麗，草食性。"},
+    {c:"潮間帶生物", n:"藤壺", o:"Barnacle", d:"固著在岩石上的甲殼類動物（不是貝類），退潮時關閉殼板保濕。"},
+    {c:"潮間帶生物", n:"海蟑螂", o:"Ligia exotica", d:"甲殼類，外型像蟑螂，在岩岸海堤爬行速度極快，以腐植質為食。"},
+    {c:"潮間帶生物", n:"石蚵", o:"Saccostrea", d:"野生牡蠣，附著在岩礁上，體型較養殖的小，味鮮美。"},
+    {c:"潮間帶生物", n:"珠帶海葵", o:"Exaiptasia", d:"附著於潮池岩縫中，觸手有刺細胞，退潮時會縮成一團。"},
+    {c:"潮間帶生物", n:"陽隧足", o:"Ophiuroidea", d:"像海星但腕足細長靈活，受驚擾時會自斷腕足逃生。"},
+    {c:"潮間帶生物", n:"花笠螺", o:"Cellana toreuma", d:"殼呈斗笠狀，表面有花紋，強吸在岩石上，能抵抗海浪衝擊。"},
+    {c:"潮間帶生物", n:"玉黍螺", o:"Littorinidae", d:"岩岸最耐旱的螺類，常聚集在最高潮線的岩縫中。"},
+    {c:"潮間帶生物", n:"燒酒螺", o:"Batillaria zonalis", d:"常見於泥灘地，數量龐大，常被採集作為小吃。"},
+    {c:"潮間帶生物", n:"文蛤", o:"Meretrix lusoria", d:"俗稱粉蟯，棲息於淺海沙泥底，是重要的食用貝類。"},
+    {c:"潮間帶生物", n:"竹蟶", o:"Solenidae", d:"殼長條形像竹子，擅長挖掘沙泥躲藏，受驚擾會迅速潛入深處。"},
+    {c:"潮間帶生物", n:"花蛤", o:"Gomphina veneriformis", d:"殼表有美麗花紋，棲息於潮間帶沙礫底。"},
+    {c:"潮間帶生物", n:"海瓜子簾蛤", o:"Ruditapes philippinarum", d:"俗稱海瓜子，殼面有明顯網紋，常見於市場的食用貝類。"},
+    {c:"潮間帶生物", n:"玉螺", o:"Naticidae", d:"肉食性貝類，會分泌酸液在其他貝殼上鑽洞，吸食其肉。"},
+    {c:"潮間帶生物", n:"綠蠵龜", o:"Chelonia mydas", d:"保育類爬蟲動物，主食海草與藻類，偶爾會上岸產卵。"},
+    {c:"潮間帶生物", n:"石蓴", o:"Ulva lactuca", d:"俗稱海萵苣，綠藻的一種，薄膜狀鮮綠色，退潮時常覆蓋在岩石上。"},
+    {c:"潮間帶生物", n:"馬尾藻", o:"Sargassum", d:"褐藻的一種，具有氣囊能漂浮在水中，是魚苗重要的躲藏處。"},
+    {c:"潮間帶生物", n:"石花菜", o:"Gelidium", d:"紅藻的一種，生長在低潮線岩石上，是製作石花凍（寒天）的原料。"},
+    {c:"潮間帶生物", n:"蓬萊草蜥", o:"Takydromus stejnegeri", d:"台灣特有種，常見於濱海草叢，尾巴極長。"},
+    {c:"潮間帶生物", n:"海参", o:"Holothuroidea", d:"身體柔軟長條狀，受刺激會吐出內臟防禦，具再生能力。"},
+    {c:"潮間帶生物", n:"海膽", o:"Echinoidea", d:"渾身長滿棘刺，以藻類為食，口器位於底部稱「亞里斯多德提燈」。"}
+];
+
+// --- 邏輯功能 ---
+let dailyItem;
+let quizQueue = []; // 題目佇列
+let currentCategory = ''; // 當前測驗分類
+
+async function init() {
+    const date = new Date();
+    const seed = date.getFullYear()*10000 + (date.getMonth()+1)*100 + date.getDate();
+    dailyItem = db[seed % db.length];
+    
+    document.getElementById('d-category').innerText = dailyItem.c;
+    document.getElementById('d-fullname').innerText = dailyItem.n;
+    document.getElementById('d-alias').innerText = dailyItem.o.split('/')[0];
+    document.getElementById('d-img').src = await getImg(dailyItem.n, dailyItem.c, dailyItem.o);
+
+    const select = document.getElementById('category-filter');
+    const quizSelect = document.getElementById('quiz-filter');
+    
+    [...new Set(db.map(x=>x.c))].forEach(c => {
+        select.innerHTML += `<option value="${c}">${c}</option>`;
+        quizSelect.innerHTML += `<option value="${c}">${c} (專項測驗)</option>`;
+    });
+    
+    document.getElementById('total-count').innerText = db.length;
+    renderList();
+    
+    // 初始化測驗
+    resetQuizQueue();
+}
+
+function getFallbackImage(category) {
+    let icon = "🌿";
+    let color = "#eceff1";
+    if(category.includes("鳥")) { icon = "🐦"; color="#e3f2fd"; }
+    else if(category.includes("蟹") || category.includes("潮間帶")) { icon = "🦀"; color="#fff3e0"; }
+    
+    const svg = `
+    <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="${color}"/>
+        <text x="50%" y="45%" font-size="80" text-anchor="middle" dominant-baseline="middle">${icon}</text>
+        <text x="50%" y="65%" font-size="24" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">暫無影像</text>
+    </svg>`;
+    return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+}
+
+async function getImg(n, c, o) {
+    const scientificName = o.split('/')[0].trim();
+    const keywords = [scientificName, n];
+
+    for(let k of keywords) {
+        if(!k || k.length < 2) continue; 
+        try {
+            let url = `https://zh.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(k)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*`;
+            let res = await fetch(url);
+            let data = await res.json();
+            
+            if(data.query && data.query.pages) {
+                let page = Object.values(data.query.pages)[0];
+                if(page.thumbnail) return page.thumbnail.source;
+            }
+
+            if(k === scientificName) {
+                url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(k)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*`;
+                res = await fetch(url);
+                data = await res.json();
+                if(data.query && data.query.pages) {
+                    let page = Object.values(data.query.pages)[0];
+                    if(page.thumbnail) return page.thumbnail.source;
+                }
+            }
+        } catch(e) {}
+    }
+    return getFallbackImage(c);
+}
+
+function flipCard() {
+    document.querySelector('.daily-card-container').classList.toggle('flipped');
+    playSfx('flip');
+}
+
+// --- 測驗系統 (不重複邏輯) ---
+let qItem;
+
+function resetQuizQueue() {
+    const filter = document.getElementById('quiz-filter').value;
+    currentCategory = filter;
+    
+    // 建立題目池
+    let pool = (filter === 'all') ? db : db.filter(item => item.c === filter);
+    
+    // 複製一份並洗牌
+    quizQueue = [...pool].sort(() => Math.random() - 0.5);
+    
+    // 開始第一題
+    initQuiz();
+}
+
+async function initQuiz() {
+    document.getElementById('q-feedback').style.display = 'none';
+    
+    // 如果佇列空了，重新洗牌
+    if (quizQueue.length === 0) {
+        alert("恭喜！本輪題目已全部做完，將重新開始。");
+        resetQuizQueue();
+        return;
+    }
+
+    // 更新進度顯示
+    document.getElementById('quiz-status').innerText = `本輪剩餘：${quizQueue.length} 題`;
+
+    // 取出一題
+    qItem = quizQueue.pop();
+    
+    document.getElementById('q-question').innerText = `[${qItem.c}] ???`;
+    document.getElementById('q-img').src = await getImg(qItem.n, qItem.c, qItem.o);
+
+    // 產生干擾項 (同類別)
+    let distractorPool = db.filter(item => item.c === qItem.c);
+    
+    let opts = [qItem];
+    while(opts.length < 4) {
+        let r = distractorPool[Math.floor(Math.random() * distractorPool.length)];
+        if(!opts.includes(r) && r.n !== qItem.n) opts.push(r);
+    }
+    opts.sort(()=>Math.random()-0.5);
+
+    document.getElementById('q-options').innerHTML = opts.map(o => 
+        `<button class="q-btn" onclick="checkQuiz(this, '${o.n}')">${o.n}</button>`
+    ).join('');
+}
+
+function nextQuiz() {
+    initQuiz();
+}
+
+function checkQuiz(btn, ans) {
+    const btns = document.querySelectorAll('.q-btn');
+    btns.forEach(b => b.disabled = true);
+    const fb = document.getElementById('q-feedback');
+    fb.style.display = 'block';
+    
+    if(ans === qItem.n) {
+        playSfx('correct');
+        btn.classList.add('correct');
+        fb.innerHTML = `<b style="color:green">✅ 答對了！</b><br>這是 <b>${qItem.n}</b> (${qItem.o})。<br>${qItem.d}`;
+    } else {
+        playSfx('wrong');
+        btn.classList.add('wrong');
+        btns.forEach(b => { if(b.innerText === qItem.n) b.classList.add('correct'); });
+        fb.innerHTML = `<b style="color:red">❌ 答錯了！</b><br>正確答案是 <b>${qItem.n}</b> (${qItem.o})。<br>${qItem.d}`;
+        // 答錯把題目放回佇列底部，稍後再考
+        quizQueue.unshift(qItem);
+    }
+    
+    document.getElementById('quiz-status').innerText = `本輪剩餘：${quizQueue.length} 題`;
+}
+
+function renderList() {
+    const grid = document.getElementById('list-grid');
+    const cf = document.getElementById('category-filter').value;
+    const kw = document.getElementById('keyword').value.toLowerCase();
+    
+    const list = db.filter(x => (cf==="" || x.c===cf) && (x.n.includes(kw) || x.o.toLowerCase().includes(kw)));
+    
+    grid.innerHTML = list.map(item => `
+        <div class="grid-item" onclick='openModal(${JSON.stringify(item)}); playSfx("click")'>
+            <div class="category-label">${item.c}</div>
+            <h3>${item.n}</h3>
+            <div class="old">${item.o.split('/')[0]}</div>
+        </div>
+    `).join('');
+}
+
+async function openModal(item) {
+    if(typeof item === 'string') item = JSON.parse(item);
+    document.getElementById('m-category').innerText = item.c;
+    document.getElementById('m-name').innerText = item.n;
+    document.getElementById('m-alias').innerText = item.o;
+    document.getElementById('m-desc').innerText = item.d;
+    document.getElementById('m-img').src = await getImg(item.n, item.c, item.o);
+    document.getElementById('modal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+function setTab(id, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    btn.classList.add('active');
+    if(id==='quiz') resetQuizQueue(); // 切換到測驗時重置或繼續
+}
+
+window.onload = init;
+</script>
+
+</body>
+</html>
